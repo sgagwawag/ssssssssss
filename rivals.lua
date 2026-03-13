@@ -1,14 +1,20 @@
+-- Universal Rivals ESP + Aimbot (Orion UI) - 2026 mobile/PC compatible
+-- Paste into Pastebin/GitHub → use loadstring(game:HttpGet("your_raw_link"))()
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/ionlyusegithubformcmods/1-Line-Scripts/main/Mobile%20Friendly%20Orion')))()
 
 local Window = OrionLib:MakeWindow({
-    Name = "Rivals | ESP + Aimbot",
+    Name = "Universal ESP + Aimbot",
     HidePremium = false,
     SaveConfig = true,
-    ConfigFolder = "RivalsHub2026"
+    ConfigFolder = "UniversalHub"
 })
 
-local Tab = Window:MakeTab({
-    Name = "Main",
+-- Main Tab
+local MainTab = Window:MakeTab({
+    Name = "Main Features",
     Icon = "rbxassetid://4483345998",
     PremiumOnly = false
 })
@@ -25,143 +31,158 @@ local highlights = {}
 local aimConnection = nil
 
 -- ==================== ESP ====================
-Tab:AddToggle({
-    Name = "ESP (Highlight + Name + Distance)",
+function addESP(plr)
+    if highlights[plr] or plr == game.Players.LocalPlayer then return end
+    
+    local char = plr.Character or plr.CharacterAdded:Wait()
+    if not char then return end
+    
+    local hl = Instance.new("Highlight")
+    hl.FillColor = Color3.fromRGB(255, 80, 255)
+    hl.OutlineColor = Color3.new(1,1,1)
+    hl.FillTransparency = 0.45
+    hl.OutlineTransparency = 0
+    hl.Parent = char
+    
+    local bg = Instance.new("BillboardGui")
+    bg.Size = UDim2.new(0, 220, 0, 60)
+    bg.StudsOffset = Vector3.new(0, 3.5, 0)
+    bg.AlwaysOnTop = true
+    bg.Parent = char:FindFirstChild("Head") or char:FindFirstChildWhichIsA("BasePart")
+    
+    local nameLabel = Instance.new("TextLabel", bg)
+    nameLabel.Size = UDim2.new(1,0,0.5,0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = plr.Name
+    nameLabel.TextColor3 = Color3.new(1,1,1)
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.GothamBold
+    
+    local distLabel = Instance.new("TextLabel", bg)
+    distLabel.Size = UDim2.new(1,0,0.5,0)
+    distLabel.Position = UDim2.new(0,0,0.5,0)
+    distLabel.BackgroundTransparency = 1
+    distLabel.TextColor3 = Color3.new(1,1,0)
+    distLabel.TextScaled = true
+    
+    highlights[plr] = {hl, bg, distLabel}
+end
+
+-- ESP toggle
+MainTab:AddToggle({
+    Name = "Player ESP (Highlight + Name + Distance)",
     Default = false,
     Callback = function(Value)
         ESP_ENABLED = Value
+        OrionLib:MakeNotification({
+            Name = "ESP",
+            Content = Value and "Enabled" or "Disabled",
+            Time = 3
+        })
         
         if Value then
-            OrionLib:MakeNotification({Name = "ESP", Content = "Enabled", Time = 3})
-            
             for _, plr in pairs(game.Players:GetPlayers()) do
-                if plr ~= game.Players.LocalPlayer and plr.Character then
-                    spawn(function() addESP(plr) end)
-                end
+                spawn(function() addESP(plr) end)
             end
         else
-            OrionLib:MakeNotification({Name = "ESP", Content = "Disabled", Time = 3})
-            for _, v in pairs(highlights) do v:Destroy() end
+            for _, data in pairs(highlights) do
+                for _, obj in ipairs(data) do obj:Destroy() end
+            end
             highlights = {}
         end
     end
 })
 
-function addESP(plr)
-    if highlights[plr] then return end
-    local hl = Instance.new("Highlight")
-    hl.FillColor = Color3.fromRGB(255, 50, 255)
-    hl.OutlineColor = Color3.new(1,1,1)
-    hl.FillTransparency = 0.4
-    hl.Parent = plr.Character
-    
-    local bg = Instance.new("BillboardGui")
-    bg.Size = UDim2.new(0,200,0,60)
-    bg.StudsOffset = Vector3.new(0,3,0)
-    bg.AlwaysOnTop = true
-    bg.Parent = plr.Character:FindFirstChild("Head") or plr.Character
-    
-    local name = Instance.new("TextLabel", bg)
-    name.Size = UDim2.new(1,0,0.5,0)
-    name.BackgroundTransparency = 1
-    name.Text = plr.Name
-    name.TextColor3 = Color3.new(1,1,1)
-    name.TextScaled = true
-    
-    local dist = Instance.new("TextLabel", bg)
-    dist.Size = UDim2.new(1,0,0.5,0)
-    dist.Position = UDim2.new(0,0,0.5,0)
-    dist.BackgroundTransparency = 1
-    dist.TextColor3 = Color3.new(1,1,0)
-    dist.TextScaled = true
-    
-    highlights[plr] = {hl, bg, dist}
-end
-
--- Update distance loop
+-- Distance update
 game:GetService("RunService").RenderStepped:Connect(function()
     if not ESP_ENABLED then return end
     for plr, data in pairs(highlights) do
         if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local d = (plr.Character.HumanoidRootPart.Position - workspace.CurrentCamera.CFrame.Position).Magnitude
-            data[3].Text = "Dist: " .. math.floor(d)
+            local dist = (plr.Character.HumanoidRootPart.Position - workspace.CurrentCamera.CFrame.Position).Magnitude
+            data[3].Text = "Dist: " .. math.floor(dist) .. " studs"
         end
     end
 end)
 
+-- Auto-add new players
+game.Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function() if ESP_ENABLED then addESP(plr) end end)
+end)
+
 -- ==================== AIMBOT ====================
-Tab:AddToggle({
-    Name = "Aimbot (Camera)",
+MainTab:AddToggle({
+    Name = "Smooth Aimbot (Camera)",
     Default = false,
     Callback = function(Value)
         AIM_ENABLED = Value
+        OrionLib:MakeNotification({
+            Name = "Aimbot",
+            Content = Value and "Enabled" or "Disabled",
+            Time = 3
+        })
         
         if Value then
-            OrionLib:MakeNotification({Name = "Aimbot", Content = "Enabled - Hold mouse to aim", Time = 3})
-            
             aimConnection = game:GetService("RunService").RenderStepped:Connect(function()
                 if not AIM_ENABLED then return end
                 
-                local closest = nil
-                local closestDist = AIM_FOV
+                local closest, closestDist = nil, AIM_FOV
                 
                 for _, plr in pairs(game.Players:GetPlayers()) do
                     if plr == game.Players.LocalPlayer or not plr.Character or not plr.Character:FindFirstChild(AIM_PART) then continue end
                     if TEAM_CHECK and plr.Team == game.Players.LocalPlayer.Team then continue end
                     
                     local part = plr.Character[AIM_PART]
-                    local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(part.Position)
+                    local screenPos, visible = workspace.CurrentCamera:WorldToViewportPoint(part.Position)
                     local mousePos = game:GetService("UserInputService"):GetMouseLocation()
                     local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                     
-                    if onScreen and dist < closestDist then
+                    if visible and dist < closestDist then
                         closestDist = dist
                         closest = part
                     end
                 end
                 
                 if closest then
-                    local targetCFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, closest.Position)
-                    workspace.CurrentCamera.CFrame = workspace.CurrentCamera.CFrame:Lerp(targetCFrame, AIM_SMOOTHNESS)
+                    local targetCF = CFrame.new(workspace.CurrentCamera.CFrame.Position, closest.Position)
+                    workspace.CurrentCamera.CFrame = workspace.CurrentCamera.CFrame:Lerp(targetCF, AIM_SMOOTHNESS)
                 end
             end)
         else
-            OrionLib:MakeNotification({Name = "Aimbot", Content = "Disabled", Time = 3})
-            if aimConnection then aimConnection:Disconnect() end
+            if aimConnection then aimConnection:Disconnect() aimConnection = nil end
         end
     end
 })
 
 -- Settings
-Tab:AddSlider({
-    Name = "Aimbot Smoothness",
+MainTab:AddSlider({
+    Name = "Aimbot Smoothness (lower = snappier)",
     Min = 0.05,
-    Max = 0.5,
+    Max = 0.6,
     Default = 0.15,
     Increment = 0.01,
-    Callback = function(Value) AIM_SMOOTHNESS = Value end
+    Callback = function(v) AIM_SMOOTHNESS = v end
 })
 
-Tab:AddSlider({
+MainTab:AddSlider({
     Name = "Aimbot FOV",
-    Min = 50,
-    Max = 400,
+    Min = 40,
+    Max = 500,
     Default = 150,
-    Increment = 10,
-    Callback = function(Value) AIM_FOV = Value end
+    Increment = 5,
+    Callback = function(v) AIM_FOV = v end
 })
 
-Tab:AddDropdown({
+MainTab:AddDropdown({
     Name = "Aim Part",
     Default = "Head",
-    Options = {"Head", "UpperTorso", "HumanoidRootPart"},
-    Callback = function(Value) AIM_PART = Value end
+    Options = {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso"},
+    Callback = function(v) AIM_PART = v end
 })
 
-Tab:AddToggle({
-    Name = "Team Check",
+MainTab:AddToggle({
+    Name = "Team Check (Don't aim teammates)",
     Default = true,
-    Callback = function(Value) TEAM_CHECK = Value end
+    Callback = function(v) TEAM_CHECK = v end
 })
 
-print("Rivals ESP + Aimbot loaded! Open the Orion menu and toggle.")
+print("Universal ESP + Aimbot loaded - works in most FPS games with humanoid characters")
