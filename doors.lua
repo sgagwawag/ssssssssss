@@ -1,121 +1,128 @@
--- DOORS | ImGui Style ESP Hub (Linoria) – Delta Mobile Ready 2026
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/ionlyusegithubformcmods/1-Line-Scripts/main/Mobile%20Friendly%20Orion')))()
 
-local Linoria = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
+local Window = OrionLib:MakeWindow({
+    Name = "DOORS | ESP Hub 2026",
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "DoorsESP"
+})
 
-local Window = Linoria:CreateWindow({
-    Name = "DOORS | ImGui ESP Hub",
-    Size = UDim2.new(0, 460, 0, 600),
-    Theme = "Dark" -- ImGui clean dark look
+local MainTab = Window:MakeTab({
+    Name = "ESP & Visuals",
+    Icon = "rbxassetid://4483362458",
+    PremiumOnly = false
 })
 
 -- Variables
-local entityESP = false
-local itemESP = false
-local highlights = {}
+local EntityESP = false
+local ItemESP = false
+local espObjects = {}
 
-local entities = {"RushMoving", "AmbushMoving", "Seek", "FigureRig", "Screech", "Eyes", "Halt", "Dupe", "Jack", "Timothy", "Snare"}
-local items = {"KeyObtain", "LeverForGate", "LiveHintBook", "Battery", "Flashlight", "Lighter", "Crucifix", "Lockpick", "Fuse", "Wardrobe", "Bed"}
+-- Entity & Item names (updated for current DOORS 2026 - Hotel + Mines)
+local entities = {"RushMoving", "AmbushMoving", "SeekMoving", "FigureRig", "Screech", "Eyes", "Halt", "Dupe", "Jack", "Timothy", "Snare"}
+local items = {"KeyObtain", "Crucifix", "Battery", "Flashlight", "Lighter", "Lockpick", "LiveHintBook", "Fuse", "LeverForGate", "Wardrobe", "Bed"}
 
--- ==================== ESP FUNCTIONS ====================
-local function createESP(part, color, text)
-    if part:FindFirstChild("ESP_Highlight") then return end
+-- Create ESP highlight + label
+local function addESP(obj, color, labelText)
+    if obj:FindFirstChild("DOORS_ESP") then return end
     
     local hl = Instance.new("Highlight")
-    hl.Name = "ESP_Highlight"
+    hl.Name = "DOORS_ESP"
     hl.FillColor = color
     hl.OutlineColor = Color3.new(1,1,1)
     hl.FillTransparency = 0.4
     hl.OutlineTransparency = 0
-    hl.Parent = part
+    hl.Parent = obj
     
-    local bg = Instance.new("BillboardGui")
-    bg.Size = UDim2.new(0, 200, 0, 50)
-    bg.StudsOffset = Vector3.new(0, 4, 0)
-    bg.AlwaysOnTop = true
-    bg.Parent = part:FindFirstChild("Head") or part
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "DOORS_Label"
+    billboard.Size = UDim2.new(0, 180, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = obj.PrimaryPart or obj:FindFirstChild("Main") or obj
     
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1,0,1,0)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = color
-    label.TextScaled = true
-    label.Font = Enum.Font.GothamBold
-    label.Parent = bg
+    local text = Instance.new("TextLabel", billboard)
+    text.Size = UDim2.new(1,0,1,0)
+    text.BackgroundTransparency = 1
+    text.Text = labelText
+    text.TextColor3 = color
+    text.TextScaled = true
+    text.Font = Enum.Font.GothamBold
     
-    table.insert(highlights, {hl, bg})
+    table.insert(espObjects, {hl = hl, gui = billboard})
 end
 
-local function updateESP()
+-- Main ESP update loop
+spawn(function()
     while true do
-        task.wait(0.8)
-        if not (entityESP or itemESP) then continue end
+        task.wait(1)
+        if not (EntityESP or ItemESP) then continue end
         
         for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
-            for _, obj in pairs(room:GetDescendants()) do
-                -- Entity ESP
-                if entityESP then
-                    for _, name in pairs(entities) do
-                        if obj.Name == name or obj:FindFirstChild(name) then
-                            createESP(obj, Color3.fromRGB(255, 50, 50), obj.Name .. " ⚠️")
+            for _, descendant in pairs(room:GetDescendants()) do
+                -- Entity check
+                if EntityESP then
+                    for _, ent in ipairs(entities) do
+                        if descendant.Name == ent or descendant:FindFirstChild(ent) then
+                            local displayName = ent:gsub("Moving", ""):gsub("Rig", "")
+                            addESP(descendant, Color3.fromRGB(255, 40, 40), displayName .. " ⚠️")
                         end
                     end
                 end
                 
-                -- Item ESP
-                if itemESP then
-                    for _, name in pairs(items) do
-                        if obj.Name == name or string.find(obj.Name, name) then
-                            local col = (name == "KeyObtain" or name == "Crucifix") and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(0, 255, 100)
-                            createESP(obj, col, name)
+                -- Item check
+                if ItemESP then
+                    for _, itm in ipairs(items) do
+                        if descendant.Name == itm or string.find(descendant.Name:lower(), itm:lower()) then
+                            local col = (itm == "KeyObtain" or itm == "Crucifix") and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(0, 255, 150)
+                            addESP(descendant, col, itm)
                         end
                     end
                 end
             end
         end
     end
-end
+end)
 
--- ==================== UI TABS ====================
-local Visuals = Window:CreateTab("Visuals 👁️")
-
-Visuals:CreateToggle({
-    Name = "Entity ESP (Rush, Ambush, Figure, Seek...)",
+-- Toggles
+MainTab:AddToggle({
+    Name = "Entity ESP (Rush, Ambush, Figure, Seek, Screech...)",
     Default = false,
-    Callback = function(v) entityESP = v end
+    Callback = function(v) EntityESP = v end
 })
 
-Visuals:CreateToggle({
-    Name = "Item ESP (Keys, Levers, Crucifix, Batteries...)",
+MainTab:AddToggle({
+    Name = "Item ESP (Keys, Crucifix, Battery, Books...)",
     Default = false,
-    Callback = function(v) itemESP = v end
+    Callback = function(v) ItemESP = v end
 })
 
-Visuals:CreateToggle({
+MainTab:AddToggle({
     Name = "Fullbright (No Darkness)",
     Default = false,
     Callback = function(v)
-        game.Lighting.Brightness = v and 2 or 1
-        game.Lighting.ClockTime = v and 12 or 20
-        game.Lighting.FogEnd = v and 999999 or 100
+        game.Lighting.Brightness = v and 3 or 1
+        game.Lighting.ClockTime = v and 12 or 18
+        game.Lighting.FogEnd = v and 99999 or 100
     end
 })
 
-local Movement = Window:CreateTab("Movement ⚡")
+-- Movement tab extras
+local MoveTab = Window:MakeTab({Name = "Movement"})
 
-Movement:CreateSlider({
-    Name = "WalkSpeed",
+MoveTab:AddSlider({
+    Name = "Walk Speed",
     Min = 16,
-    Max = 100,
+    Max = 120,
     Default = 16,
+    Increment = 1,
     Callback = function(v)
-        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
-            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = v
-        end
+        local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid")
+        if hum then hum.WalkSpeed = v end
     end
 })
 
-Movement:CreateToggle({
+MoveTab:AddToggle({
     Name = "Noclip",
     Default = false,
     Callback = function(v)
@@ -131,9 +138,10 @@ Movement:CreateToggle({
     end
 })
 
--- Start ESP loop
-spawn(updateESP)
+OrionLib:MakeNotification({
+    Name = "DOORS Hub Loaded",
+    Content = "Entity & Item ESP ready • Toggle in menu",
+    Time = 5
+})
 
-Linoria:Notify("DOORS ESP Hub Loaded", "Entity + Item ESP active • Use on alt account", 5)
-
-print("DOORS ImGui-style ESP loaded • Press RightCtrl to open menu")
+print("DOORS ESP Hub loaded - Use alt account")
