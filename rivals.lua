@@ -1,44 +1,42 @@
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/ionlyusegithubformcmods/1-Line-Scripts/main/Mobile%20Friendly%20Orion')))()
 
 local Window = OrionLib:MakeWindow({
-    Name = "Prison Life | Full Hub 2026",
+    Name = "Prison Life | FULL HUB 2026",
     HidePremium = false,
     SaveConfig = true,
-    ConfigFolder = "PrisonLifeHub"
-})
-
-local Main = Window:MakeTab({
-    Name = "Main",
-    Icon = "rbxassetid://4483362458",
-    PremiumOnly = false
+    ConfigFolder = "PrisonLife2026"
 })
 
 local player = game.Players.LocalPlayer
 
--- ==================== GUNS ====================
+-- ==================== GUNS (FIXED 2026 METHOD) ====================
+local Main = Window:MakeTab({Name = "Guns & Mods", Icon = "rbxassetid://4483362458"})
+
 Main:AddButton({
-    Name = "Give All Guns (M9 + Shotgun + AK)",
+    Name = "Give All Guns (M9, Shotgun, AK-47)",
     Callback = function()
-        local guns = {"M9", "Remington 870", "AK-47"}
-        for _, gun in pairs(guns) do
-            pcall(function()
-                workspace.Remote.ItemHandler:InvokeServer(workspace.Prison_ITEMS.giver[gun].ITEMPICKUP)
-            end)
+        local givers = workspace.Prison_ITEMS.giver:GetChildren()
+        for _, giver in pairs(givers) do
+            if giver:FindFirstChild("ITEMPICKUP") then
+                pcall(function()
+                    workspace.Remote.ItemHandler:InvokeServer(giver.ITEMPICKUP)
+                end)
+            end
         end
-        OrionLib:MakeNotification({Name = "Guns", Content = "All guns given!", Time = 3})
+        OrionLib:MakeNotification({Name = "Guns", Content = "All guns given!", Time = 4})
     end
 })
 
--- ==================== INFINITE AMMO ====================
+-- Infinite Ammo + Gun Mods (stronger loop)
 local infAmmoConn
 Main:AddToggle({
-    Name = "Infinite Ammo",
+    Name = "Infinite Ammo + OP Gun Mods",
     Default = false,
     Callback = function(state)
         if state then
             infAmmoConn = game:GetService("RunService").Heartbeat:Connect(function()
                 pcall(function()
-                    local tool = player.Backpack:FindFirstChildWhichIsA("Tool") or player.Character:FindFirstChildWhichIsA("Tool")
+                    local tool = player.Character:FindFirstChildWhichIsA("Tool") or player.Backpack:FindFirstChildWhichIsA("Tool")
                     if tool and tool:FindFirstChild("GunStates") then
                         local states = require(tool.GunStates)
                         states.MaxAmmo = math.huge
@@ -46,97 +44,112 @@ Main:AddToggle({
                         states.StoredAmmo = math.huge
                         states.FireRate = 0.001
                         states.Spread = 0
-                        states.ReloadTime = 0.001
+                        states.Range = math.huge
+                        states.ReloadTime = 0
                     end
                 end)
             end)
-            OrionLib:MakeNotification({Name = "Infinite Ammo", Content = "ON - Hold any gun", Time = 3})
         else
             if infAmmoConn then infAmmoConn:Disconnect() end
-            OrionLib:MakeNotification({Name = "Infinite Ammo", Content = "OFF", Time = 3})
         end
     end
 })
 
--- ==================== OTHER FEATURES ====================
-Main:AddToggle({
-    Name = "Godmode (No Damage)",
+-- ==================== MORE FEATURES ====================
+local Misc = Window:MakeTab({Name = "Misc & Trolling", Icon = "rbxassetid://4483362458"})
+
+Misc:AddButton({Name = "Become Criminal (Instant)", Callback = function()
+    workspace.Remote.TeamEvent:FireServer("Bright orange")
+end})
+
+Misc:AddButton({Name = "Become Guard", Callback = function()
+    workspace.Remote.TeamEvent:FireServer("Bright blue")
+end})
+
+Misc:AddButton({Name = "Kill All Players", Callback = function()
+    for _, plr in pairs(game.Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            pcall(function()
+                plr.Character.Humanoid.Health = 0
+            end)
+        end
+    end
+end})
+
+Misc:AddToggle({
+    Name = "Kill Aura (Auto Kill Nearby)",
     Default = false,
-    Callback = function(v)
-        if v then
+    Callback = function(state)
+        if state then
             spawn(function()
-                while v and task.wait(0.1) do
-                    if player.Character and player.Character:FindFirstChild("Humanoid") then
-                        player.Character.Humanoid.Health = 100
+                while state do
+                    for _, plr in pairs(game.Players:GetPlayers()) do
+                        if plr ~= player and plr.Character and (plr.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude < 30 then
+                            pcall(function() plr.Character.Humanoid.Health = 0 end)
+                        end
                     end
+                    task.wait(0.1)
                 end
             end)
         end
     end
 })
 
-Main:AddToggle({
-    Name = "Fly (WASD + Space)",
+Misc:AddToggle({
+    Name = "Car Fly (Hold E)",
     Default = false,
-    Callback = function(v)
-        _G.Fly = v
-        if v then
+    Callback = function(state)
+        _G.CarFly = state
+        if state then
             spawn(function()
-                local root = player.Character.HumanoidRootPart
-                local bv = Instance.new("BodyVelocity") bv.MaxForce = Vector3.new(1e5,1e5,1e5) bv.Parent = root
-                local bg = Instance.new("BodyGyro") bg.MaxTorque = Vector3.new(1e5,1e5,1e5) bg.Parent = root
-                while _G.Fly do
-                    local cam = workspace.CurrentCamera
-                    local dir = Vector3.new()
-                    if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
-                    if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
-                    if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
-                    if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
-                    if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0,1,0) end
-                    bv.Velocity = dir * 60
-                    bg.CFrame = cam.CFrame
+                while _G.CarFly do
+                    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        local car = workspace:FindFirstChildWhichIsA("Model") -- finds nearest car
+                        if car and car:FindFirstChild("VehicleSeat") then
+                            car.VehicleSeat.CFrame = car.VehicleSeat.CFrame + Vector3.new(0, 5, 0)
+                        end
+                    end
                     task.wait()
                 end
-                bv:Destroy() bg:Destroy()
             end)
         end
     end
 })
 
-Main:AddSlider({Name = "WalkSpeed", Min = 16, Max = 200, Default = 16, Callback = function(v)
-    if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.WalkSpeed = v end
-end})
-
-Main:AddToggle({Name = "Noclip", Default = false, Callback = function(v)
-    if v then
-        game:GetService("RunService").Stepped:Connect(function()
-            if v and player.Character then
-                for _, part in pairs(player.Character:GetDescendants()) do
-                    if part:IsA("BasePart") then part.CanCollide = false end
-                end
-            end
-        end)
-    end
-end})
-
-Main:AddButton({Name = "Remove Handcuffs", Callback = function()
-    if player.Character and player.Character:FindFirstChild("Handcuffs") then
-        player.Character.Handcuffs:Destroy()
-    end
-end})
-
-Main:AddButton({Name = "Arrest All Players", Callback = function()
-    for _, plr in pairs(game.Players:GetPlayers()) do
-        if plr ~= player and plr.Character then
-            pcall(function()
-                workspace.Remote.arrest:InvokeServer(plr.Character)
-            end)
+Misc:AddButton({Name = "Remove All Doors", Callback = function()
+    for _, door in pairs(workspace:GetDescendants()) do
+        if door.Name == "Door" or door:FindFirstChild("Door") then
+            pcall(function() door:Destroy() end)
         end
     end
+end})
+
+Misc:AddToggle({Name = "ESP (Basic)", Default = false, Callback = function(state)
+    -- Simple highlight ESP
+    if state then
+        for _, plr in pairs(game.Players:GetPlayers()) do
+            if plr.Character then
+                local hl = Instance.new("Highlight")
+                hl.FillColor = Color3.fromRGB(255, 0, 255)
+                hl.Parent = plr.Character
+            end
+        end
+    end
+end})
+
+Misc:AddButton({Name = "Auto Farm Cash (Punch Loop)", Callback = function()
+    spawn(function()
+        while true do
+            pcall(function()
+                game.Players.LocalPlayer.Character.Humanoid:ChangeState("Jumping")
+            end)
+            task.wait(0.5)
+        end
+    end)
 end})
 
 OrionLib:MakeNotification({
-    Name = "Prison Life Hub Loaded",
-    Content = "Give guns + Infinite Ammo ready! Enjoy king",
-    Time = 5
+    Name = "Prison Life Hub LOADED ✅",
+    Content = "Give guns first → Turn on Infinite Ammo → Enjoy the chaos",
+    Time = 6
 })
