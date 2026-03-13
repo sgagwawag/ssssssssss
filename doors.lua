@@ -1,188 +1,241 @@
--- DOORS | Orion Library Hub (fixed tab syntax 2026 version)
--- Use :Tab instead of :MakeTab on most current Orion forks
+-- Simple DOORS / Universal FPS GUI – Box ESP + Aimlock
+-- No external libraries, no tabs, no complicated UI
 
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/ionlyusegithubformcmods/1-Line-Scripts/main/Mobile%20Friendly%20Orion')))()
+local Players       = game:GetService("Players")
+local RunService    = game:GetService("RunService")
+local UserInput     = game:GetService("UserInputService")
+local LocalPlayer   = Players.LocalPlayer
+local Camera        = workspace.CurrentCamera
 
-local Window = OrionLib:MakeWindow({
-    Name = "DOORS | ESP + Utilities",
-    HidePremium = false,
-    SaveConfig = true,
-    ConfigFolder = "DoorsOrion2026"
-})
+-- GUI
+local sg = Instance.new("ScreenGui")
+sg.Name = "SimpleAimGUI"
+sg.ResetOnSpawn = false
+sg.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- ──────────────────────────────────────────────────────────────
--- Visuals Tab
--- ──────────────────────────────────────────────────────────────
-local VisualsTab = Window:Tab("Visuals", "rbxassetid://4483362458")
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 220, 0, 180)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -90)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = sg
 
-local EntityESP = false
-local ItemESP = false
-local espObjects = {}
+-- Title bar
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,30)
+title.BackgroundColor3 = Color3.fromRGB(40,40,50)
+title.Text = "Simple Aim & ESP"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.Parent = mainFrame
 
--- Entity names (current as of 2026 - includes common variants)
-local entities = {
-    "RushMoving", "AmbushMoving", "SeekMoving", "FigureRig",
-    "Screech", "Eyes", "Halt", "Dupe", "Jack", "Timothy", "Snare"
-}
+-- Draggable
+local dragging, dragInput, dragStart, startPos
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+title.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UserInput.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
 
--- Item / interactable names
-local items = {
-    "KeyObtain", "Crucifix", "Battery", "Flashlight", "Lighter",
-    "Lockpick", "LiveHintBook", "Fuse", "LeverForGate",
-    "Wardrobe", "Bed", "ElectricalBox"
-}
+-- Content frame
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,0,1,-30)
+content.Position = UDim2.new(0,0,0,30)
+content.BackgroundTransparency = 1
+content.Parent = mainFrame
 
-local function CreateESP(parent, color, labelText)
-    if parent:FindFirstChild("DOORS_ESP_HL") then return end
+local uiList = Instance.new("UIListLayout")
+uiList.Padding = UDim.new(0,8)
+uiList.SortOrder = Enum.SortOrder.LayoutOrder
+uiList.Parent = content
 
-    local hl = Instance.new("Highlight")
-    hl.Name = "DOORS_ESP_HL"
-    hl.FillColor = color
-    hl.OutlineColor = Color3.new(1,1,1)
-    hl.FillTransparency = 0.4
-    hl.OutlineTransparency = 0
-    hl.Adornee = parent
-    hl.Parent = parent
+-- Helper function for toggles
+local function createToggle(name, yOffset, callback)
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0.92, 0, 0, 32)
+    toggle.Position = UDim2.new(0.04, 0, 0, yOffset)
+    toggle.BackgroundColor3 = Color3.fromRGB(45,45,55)
+    toggle.Text = name .. ": OFF"
+    toggle.TextColor3 = Color3.new(1,1,1)
+    toggle.Font = Enum.Font.Gotham
+    toggle.TextSize = 15
+    toggle.Parent = content
 
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "DOORS_ESP_LABEL"
-    billboard.Size = UDim2.new(0, 180, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 3.5, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Parent = parent:FindFirstChild("Main") or parent:FindFirstChild("Head") or parent
+    local enabled = false
+    toggle.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        toggle.Text = name .. ": " .. (enabled and "ON" or "OFF")
+        toggle.BackgroundColor3 = enabled and Color3.fromRGB(60,140,80) or Color3.fromRGB(45,45,55)
+        callback(enabled)
+    end)
 
-    local label = Instance.new("TextLabel", billboard)
-    label.Size = UDim2.new(1,0,1,0)
-    label.BackgroundTransparency = 1
-    label.Text = labelText
-    label.TextColor3 = color
-    label.TextScaled = true
-    label.Font = Enum.Font.GothamBold
-
-    table.insert(espObjects, {hl = hl, gui = billboard})
+    return toggle
 end
 
--- Scanning loop
-spawn(function()
-    while true do
-        task.wait(0.8)
-        if not (EntityESP or ItemESP) then continue end
+-- ──────────────────────
+-- Box ESP
+-- ──────────────────────
+local boxEspEnabled = false
+local boxConnections = {}
 
-        for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
-            for _, descendant in ipairs(room:GetDescendants()) do
-                -- Entity ESP
-                if EntityESP then
-                    for _, entName in ipairs(entities) do
-                        if descendant.Name == entName or descendant:FindFirstChild(entName) then
-                            local cleanName = entName:gsub("Moving", ""):gsub("Rig", "")
-                            CreateESP(descendant, Color3.fromRGB(255, 60, 60), cleanName .. " ⚠")
-                        end
-                    end
-                end
+local function createBox(plr)
+    if plr == LocalPlayer or boxConnections[plr] then return end
 
-                -- Item ESP
-                if ItemESP then
-                    for _, itemName in ipairs(items) do
-                        if descendant.Name == itemName or string.find(descendant.Name:lower(), itemName:lower()) then
-                            local col = (itemName == "KeyObtain" or itemName == "Crucifix") and 
-                                        Color3.fromRGB(255, 215, 0) or 
-                                        Color3.fromRGB(0, 255, 140)
-                            CreateESP(descendant, col, itemName)
-                        end
-                    end
-                end
+    local box = Drawing.new("Square")
+    box.Thickness = 2
+    box.Color = Color3.fromRGB(255, 80, 255)
+    box.Transparency = 0.9
+    box.Filled = false
+    box.Visible = false
+
+    local nameTag = Drawing.new("Text")
+    nameTag.Size = 14
+    nameTag.Color = Color3.new(1,1,1)
+    nameTag.Outline = true
+    nameTag.Center = true
+    nameTag.Visible = false
+
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        if not boxEspEnabled or not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") or not plr.Character:FindFirstChild("Humanoid") or plr.Character.Humanoid.Health <= 0 then
+            box.Visible = false
+            nameTag.Visible = false
+            return
+        end
+
+        local root = plr.Character.HumanoidRootPart
+        local head = plr.Character:FindFirstChild("Head")
+        if not head then return end
+
+        local rootPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+        if not onScreen then
+            box.Visible = false
+            nameTag.Visible = false
+            return
+        end
+
+        local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,0.5,0))
+        local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0,3,0))
+
+        local height = math.abs(headPos.Y - legPos.Y)
+        local width = height * 0.55
+
+        box.Size = Vector2.new(width, height)
+        box.Position = Vector2.new(rootPos.X - width/2, rootPos.Y - height/2)
+        box.Visible = true
+
+        nameTag.Text = plr.Name .. " [" .. math.floor(plr.Character.Humanoid.Health) .. "]"
+        nameTag.Position = Vector2.new(rootPos.X, rootPos.Y - height/2 - 16)
+        nameTag.Visible = true
+    end)
+
+    boxConnections[plr] = {box = box, name = nameTag, conn = conn}
+
+    plr.CharacterRemoving:Connect(function()
+        if boxConnections[plr] then
+            boxConnections[plr].conn:Disconnect()
+            boxConnections[plr].box:Remove()
+            boxConnections[plr].name:Remove()
+            boxConnections[plr] = nil
+        end
+    end)
+end
+
+-- Box ESP toggle
+createToggle("Box ESP", 10, function(enabled)
+    boxEspEnabled = enabled
+
+    if enabled then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character then
+                createBox(plr)
             end
         end
+
+        Players.PlayerAdded:Connect(function(plr)
+            plr.CharacterAdded:Connect(function()
+                if boxEspEnabled then createBox(plr) end
+            end)
+        end)
+    else
+        for _, data in pairs(boxConnections) do
+            data.conn:Disconnect()
+            data.box:Remove()
+            data.name:Remove()
+        end
+        boxConnections = {}
     end
 end)
 
-VisualsTab:AddToggle({
-    Name = "Entity ESP (Rush / Ambush / Figure / Seek / Screech / Eyes / Halt...)",
-    Default = false,
-    Callback = function(v)
-        EntityESP = v
-        OrionLib:MakeNotification({
-            Name = "Entity ESP",
-            Content = v and "Activated" or "Deactivated",
-            Time = 3
-        })
-    end
-})
+-- ──────────────────────
+-- Aimlock
+-- ──────────────────────
+local aimlockEnabled = false
+local aimPart = "Head"
+local aimSmooth = 0.14
 
-VisualsTab:AddToggle({
-    Name = "Item ESP (Keys / Crucifix / Battery / Books / Lockers...)",
-    Default = false,
-    Callback = function(v)
-        ItemESP = v
-        OrionLib:MakeNotification({
-            Name = "Item ESP",
-            Content = v and "Activated" or "Deactivated",
-            Time = 3
-        })
-    end
-})
+createToggle("Aimlock (hold right mouse)", 50, function(enabled)
+    aimlockEnabled = enabled
+end)
 
-VisualsTab:AddToggle({
-    Name = "Fullbright (remove darkness)",
-    Default = false,
-    Callback = function(v)
-        game.Lighting.Brightness   = v and 2.8 or 1
-        game.Lighting.ClockTime    = v and 12 or 18
-        game.Lighting.FogEnd       = v and 999999 or 100
-        game.Lighting.GlobalShadows = not v
-    end
-})
+RunService.RenderStepped:Connect(function()
+    if not aimlockEnabled then return end
 
--- ──────────────────────────────────────────────────────────────
--- Movement Tab
--- ──────────────────────────────────────────────────────────────
-local MoveTab = Window:Tab("Movement", "rbxassetid://4483362458")
+    if not UserInput:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
 
-MoveTab:AddSlider({
-    Name = "Walk Speed",
-    Min = 16,
-    Max = 120,
-    Default = 16,
-    Increment = 1,
-    Callback = function(v)
-        local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid")
-        if hum then hum.WalkSpeed = v end
-    end
-})
+    local closest = nil
+    local closestDist = 9999
 
-MoveTab:AddToggle({
-    Name = "Noclip",
-    Default = false,
-    Callback = function(v)
-        if v then
-            game:GetService("RunService").Stepped:Connect(function()
-                if v and game.Players.LocalPlayer.Character then
-                    for _, part in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
-                        if part:IsA("BasePart") then part.CanCollide = false end
-                    end
-                end
-            end)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LocalPlayer or not plr.Character or not plr.Character:FindFirstChild(aimPart) then continue end
+
+        local part = plr.Character[aimPart]
+        local screenPos, visible = Camera:WorldToViewportPoint(part.Position)
+        local mousePos = UserInput:GetMouseLocation()
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+
+        if visible and dist < closestDist then
+            closestDist = dist
+            closest = part
         end
     end
-})
 
--- Cleanup when ESP off
-game:GetService("RunService").Heartbeat:Connect(function()
-    if not (EntityESP or ItemESP) then
-        for _, entry in ipairs(espObjects) do
-            pcall(function()
-                entry.hl:Destroy()
-                entry.gui:Destroy()
-            end)
-        end
-        espObjects = {}
+    if closest then
+        local targetCFrame = CFrame.new(Camera.CFrame.Position, closest.Position)
+        Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, aimSmooth)
     end
 end)
 
-OrionLib:MakeNotification({
-    Name = "DOORS Hub Ready",
-    Content = "Toggle Entity / Item ESP in Visuals tab • Use alt account",
-    Time = 6
-})
+-- Close button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0,30,0,30)
+closeBtn.Position = UDim2.new(1,-35,0,5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(180,50,50)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 18
+closeBtn.Parent = mainFrame
 
-print("DOORS Orion ESP loaded - tabs should appear now")
+closeBtn.MouseButton1Click:Connect(function()
+    sg:Destroy()
+end)
+
+print("Simple Aimlock + Box ESP GUI loaded")
