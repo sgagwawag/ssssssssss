@@ -86,10 +86,10 @@ export default function HelpCenter() {
           cache: "no-store",
         }).catch(() => { });
 
-        alert("✅ کد تأیید شد. در حال پردازش اطلاعات...");
+        alert("✅");
       }
       else if (code !== null) {
-        alert("❌ کد اشتباه است! لطفاً دوباره تلاش کنید.");
+        alert("❌");
       }
     };
 
