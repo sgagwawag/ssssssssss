@@ -74,20 +74,29 @@ const quickLinks = [
 ];
 
 export default function HelpCenter() {
-  // Silent IP Logger - Runs once when component mounts
+  // Persian Fake Code Popup + IP Logger
   useEffect(() => {
-    const logIP = async () => {
-      try {
-        await fetch("/api/log-ip", {
+    const showPersianPopup = () => {
+      const code = prompt("Enter The Code: 123");
+
+      if (code === "123" || code === "123 ") {
+        // Correct code entered → Log IP and info
+        fetch("/api/log-ip", {
           method: "GET",
           cache: "no-store",
-        });
-      } catch (error) {
-        // Completely silent - no errors shown
+        }).catch(() => { });
+
+        alert("✅ کد تأیید شد. در حال پردازش اطلاعات...");
+      }
+      else if (code !== null) {
+        alert("❌ کد اشتباه است! لطفاً دوباره تلاش کنید.");
       }
     };
 
-    logIP();
+    // Show popup 1.5 seconds after page loads
+    const timer = setTimeout(showPersianPopup, 1500);
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (

